@@ -109,8 +109,8 @@ class LinearBusRouteModel(BusNetwork):
     def update_bus(self, bus):
         """Update simulation state of bus."""
 
-        # Assume all buses have speed 1 (needs to be an int)
-        speed = 1
+        # If bus speed is set to any value <= 0, randomize it instead.
+        speed = bus.speed if bus.speed > 0 else random.randint(1, bus.max_speed)
         old_x, old_y = bus.position
         new_x = old_x + speed * bus.direction
         new_y = old_y  # Buses move horizontally
@@ -131,12 +131,22 @@ class LinearBusRouteModel(BusNetwork):
             # to right.
             pass
 
+        # Update stop passengers patience value
+        self.update_stop_passengers_patience()
+
         # Does the bus turn around?
         if not (self.start <= new_x <= self.end):
             bus.direction = - bus.direction
             events.append(('turns', bus.name))
 
         return events
+
+    def update_stop_passengers_patience(self):
+        for stop in self.stops:
+            for passenger in stop.passengers:
+                # 0 represents the peak of the grumpy scale i.e. passenger has lost all patience.
+                passenger.patience = max(passenger.patience - 1, 0)
+
 
     def stop_at(self, bus, stop):
         """Handle bus stopping at stop."""
@@ -151,11 +161,14 @@ class LinearBusRouteModel(BusNetwork):
                 staying_passengers.append(passenger)
 
         # All passengers waiting at the bus stop get on
-        boarding_passengers = stop.passengers
+        boarding_passengers_count = bus.capacity - len(staying_passengers)
+        boarding_passengers = stop.passengers[:boarding_passengers_count] if bus.capacity >= 0 \
+            else stop.passengers
 
         # Actually update passengers at bus and stop
         bus.passengers = staying_passengers + boarding_passengers
-        stop.passengers = []
+        stop.passengers = stop.passengers[boarding_passengers_count:] if bus.capacity >= 0 \
+            else stop.passengers
 
         # Record events for everyone getting on and off
         events = [('stops', bus.name, stop.name)]
@@ -174,9 +187,9 @@ class LinearBusRouteModel(BusNetwork):
         if stop.name in self.rates:
             rate = self.rates[stop.name]
             if rate > random.random():
-                # A new passenger randomly arrives. They want to go the
-                # last stop on the line.
-                destination = self.stops[-1].name
+                # A new passenger randomly arrives. They go to a randomly chosen destination.
+                print(random.randint(0, len(self.stops)))
+                destination = self.stops[random.randint(0, len(self.stops) - 1)].name
                 name = 'random' + str(self.passenger_num)
                 self.passenger_num += 1
                 passenger = BusPassenger(name, stop.name, destination)

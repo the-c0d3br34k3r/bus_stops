@@ -1,9 +1,10 @@
+import matplotlib
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 from busstop.objects import Bus, BusStop, BusPassenger
 from busstop.linear import LinearBusRouteModel
-
 
 def animate_model(model):
     fig = plt.figure()

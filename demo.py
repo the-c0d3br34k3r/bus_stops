@@ -6,7 +6,7 @@ from busstop.animation import animate_model
 
 
 dave = BusPassenger('Dave', 'East St', 'West St')
-joan = BusPassenger('Joan', 'East St', 'West St')
+joan = BusPassenger('Joan', 'East St', 'South St')
 
 stops = [
     BusStop('East St', (0, 0), [dave]),
@@ -16,8 +16,8 @@ stops = [
 ]
 
 buses = [
-    Bus('47', (20,0), 1, [joan]),
-    Bus('48', (40,0), -1, []),
+    Bus('47', (20,0), 1, [joan], 5, 3),
+    Bus('48', (40,0), -1, [], 3, 2),
 ]
 
 rates = {'East St': 0.03, 'North St': 0.05, 'South St': 0.03}

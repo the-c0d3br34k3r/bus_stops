@@ -4,6 +4,7 @@
 #  This file defines classes that make up the main actors in a simulation of a
 #  bus picking up passengers from bus stops.
 ##########################
+import random
 
 
 class Printable:
@@ -55,14 +56,18 @@ class BusPassenger(Printable):
     """
     parameters = 'name', 'source', 'destination'
 
-    def __init__(self, name, source, destination):
+    def __init__(self, name, source, destination, patience=5, max_patience=10):
 
         if not all(isinstance(p, str) for p in (name, source, destination)):
             raise TypeError('name, source and destination should be strings')
+        if max_patience <= 0:
+            raise TypeError('Max patience has to be a positive whole number. It cannot be a value <= 0.')
 
         self.name = name
         self.source = source
         self.destination = destination
+        # If patience is set to a value <= 0, we randomly generate a patience value b/w 0 and max_patience instead.
+        self.patience = random.randint(0, max_patience) if patience <= 0 else patience
 
 
 class BusStop(Printable):
@@ -106,12 +111,14 @@ class BusStop(Printable):
 
     def init_animation(self, ax):
         """Initialise matplotlib animation for axes ax"""
+        self.ax = ax
         self.stop_line, = ax.plot([], [], 'ro', markersize=10)
-        self.queue_line, = ax.plot([], [], 'bo')
+        self.not_grumpy_line, = ax.plot([], [], 'bo')
+        self.grumpy_line, = ax.plot([], [], 'ro')
         x, y = self.position
         self.text = ax.text(x, y-3, self.name, rotation=90,
                 verticalalignment='top', horizontalalignment='center')
-        return [self.stop_line, self.queue_line, self.text]
+        return [self.stop_line, self.not_grumpy_line, self.grumpy_line, self.text]
 
     def update_animation(self):
         """Update matplotlib animation for axes ax"""
@@ -121,11 +128,24 @@ class BusStop(Printable):
         # Redraw the queueing passingers
         qspace = 2
         num_passengers = len(self.passengers)
-        xdata = [x] * num_passengers
-        ydata = [y + qspace*(n+1) for n in range(num_passengers)]
-        self.queue_line.set_data(xdata, ydata)
+        # Number of passengers who have exhausted 100% of their patience
+        num_grumpy_passengers = len([passenger for passenger in self.passengers if passenger.patience == 0])
+        xdata = [x] * num_grumpy_passengers
+        ydata = [y + qspace*(n+1) for n in range(num_grumpy_passengers)]
+        self.grumpy_line.set_color('red')
+        # Plot all grumpy passengers first
+        self.grumpy_line.set_data(xdata, ydata)
+
+        # Plot all non grumpy passengers
+        if num_passengers > num_grumpy_passengers:
+            xdata = [x] * (num_passengers - num_grumpy_passengers)
+            if num_grumpy_passengers > 0:
+                y += num_grumpy_passengers * qspace
+            ydata = [y + qspace * (n + 1) for n in range(num_passengers - num_grumpy_passengers)]
+            self.not_grumpy_line.set_data(xdata, ydata)
+
         # Return the patches for matplotlib to update
-        return [self.stop_line, self.queue_line, self.text]
+        return [self.stop_line, self.not_grumpy_line, self.grumpy_line, self.text]
 
 
 class Bus(Printable):
@@ -152,7 +172,7 @@ class Bus(Printable):
     """
     parameters = 'name', 'position', 'direction', 'passengers'
 
-    def __init__(self, name, position, direction, passengers):
+    def __init__(self, name, position, direction, passengers, capacity=-1, speed=-1, max_speed=2):
 
         if not isinstance(name, str):
             raise TypeError('name should be a string')
@@ -163,11 +183,17 @@ class Bus(Printable):
             raise TypeError('direction should be 1 or -1')
         if not all(isinstance(p, BusPassenger) for p in passengers):
             raise TypeError('passengers should be a list of BusPassenger')
-
+        if max_speed <= 0:
+            raise TypeError('max_speed has to be a positive whole number. Cannot be a negative number or zero.')
         self.name = name
         self.position = position
         self.direction = direction
         self.passengers = list(passengers)
+        self.capacity = capacity
+        # If speed is set to a negative value, we end up randomizing the speed at every step instead i.e. the bus will
+        # have a variable speed
+        self.speed = speed
+        self.max_speed = max_speed
 
     def init_animation(self, ax):
         """Initialise matplotlib animation for axes ax"""
